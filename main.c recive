@@ -1,0 +1,100 @@
+#include <STC12C5A60S2.H>
+#include "LCD12864.H"
+#include "NRF.H"
+#include "delay.h"
+#include "temperature.h"
+
+
+
+void main()
+{
+	bit a = 1,num1=1;
+	int RxBuf[8];
+	//int RxBuf1[8];
+	//int RxBuf2[8];
+	int addr[5] = {0,0,0,0,0}; //定义5个数据用来装读取的本机地址
+	int addr1[5] = {0,0,0,0,0}; //定义5个数据用来装读取的本机地址
+	int addr2[5] = {0,0,0,0,0}; //定义5个数据用来装读取的本机地址
+	INIT_NRF();    //初始化NRF24L02
+	SPI_Read_Buf(RX_ADDR_P0,addr,5); //读取0通道接收地址
+	delay_ms(100);
+	LCD12864_Init();
+	delay_ms(2);
+	LCD12864_DisplayString(0,0,"TX_ADD_P0 地址：");
+	LCD12864_DisplayString(1,0,"地址1:");
+	LCD12864_DisplayString(2,0,"地址2:");
+	LCD12864_DisplayString(3,0,"地址3:");
+	LCD12864_DisplayString(1,3,uchartostr(addr[0]));//显示通道地址
+	LCD12864_DisplayString(1,4,uchartostr(addr[1]));//显示通道地址
+	LCD12864_DisplayString(1,5,uchartostr(addr[2]));//显示通道地址
+	LCD12864_DisplayString(1,6,uchartostr(addr[3]));//显示通道地址
+	LCD12864_DisplayString(1,7,uchartostr(addr[4]));//显示通道地址
+	
+	SPI_Read_Buf(RX_ADDR_P1,addr1,5); //读取1通道接收地址
+	delay_ms(100);
+	LCD12864_DisplayString(2,3,uchartostr(addr1[0]));//显示通道地址
+	LCD12864_DisplayString(2,4,uchartostr(addr1[1]));//显示通道地址
+	LCD12864_DisplayString(2,5,uchartostr(addr1[2]));//显示通道地址
+	LCD12864_DisplayString(2,6,uchartostr(addr1[3]));//显示通道地址
+	LCD12864_DisplayString(2,7,uchartostr(addr1[4]));//显示通道地址
+	
+	SPI_Read_Buf(RX_ADDR_P2,addr2,5); //读取2通道接收地址
+	delay_ms(100);
+	LCD12864_DisplayString(3,3,uchartostr(addr2[0]));//显示通道地址
+	LCD12864_DisplayString(3,4,uchartostr(addr2[1]));//显示通道地址
+	LCD12864_DisplayString(3,5,uchartostr(addr2[2]));//显示通道地址
+	LCD12864_DisplayString(3,6,uchartostr(addr2[3]));//显示通道地址
+	LCD12864_DisplayString(3,7,uchartostr(addr2[4]));//显示通道地址
+
+	delay_ms(2000);
+	LCD12864_Write(0x01,0);      // 写指令，不检测忙,清除LCD12864的显示内容 
+	LCD12864_DisplayString(0,0,"多机温度检测系统");
+	LCD12864_DisplayString(1,0,"  温度接收准备  ");
+	LCD12864_DisplayString(2,0,"Loding......");
+
+      SetRX_Mode();
+	while(1)
+	{
+		if(a == 1) LCD12864_DisplayString(0,0,"多机温度检测系统");
+			
+		if(!RF_IRQ) //如果接收到数据，从缓冲区将数据读取到RxBuf
+		{
+			if(num1==1)
+			{
+					LCD12864_Write(0x01,0);      // 写指令，不检测忙,清除LCD12864的显示内容 
+				       num1=0;
+			}
+                          RF_IRQ = 1;
+    	                   NRF24L02_Rxpacket(RxBuf);  //装载接收到的数据
+			     SetRX_Mode();
+			     if(RxBuf[2] == 1)                                //判断是否为1号机发送过来的数据
+			{
+			     RxBuf[2] = 0;
+			     LCD12864_DisplayString(1,0,"从机1:");
+			     LCD12864_DisplayString(1,3,uchartostr(RxBuf[0]));
+			     LCD12864_DisplayString(1,4,".");
+	  	            LCD12864_DisplayString(1,5,uchartostr(RxBuf[1]));
+			     LCD12864_DisplayString(1,6,"℃");
+			}
+                        else if(RxBuf[2] == 2)                            //判断是否为2号机发送过来的数据
+		 {
+			 RxBuf[2] = 0;
+			 LCD12864_DisplayString(2,0,"从机2:");
+			 LCD12864_DisplayString(2,3,uchartostr(RxBuf[0]));
+			 LCD12864_DisplayString(2,4,". ");
+	  	        LCD12864_DisplayString(2,5,uchartostr(RxBuf[1]));
+			 LCD12864_DisplayString(2,6,"℃");
+		 }
+			else if(RxBuf[2] == 3)                          //判断是否为3号机发送过来的数据
+			{
+				RxBuf[2] = 0;
+				LCD12864_DisplayString(3,0,"从机3:");
+			       LCD12864_DisplayString(3,3,uchartostr(RxBuf[0]));
+			       LCD12864_DisplayString(3,4,". ");
+	  	              LCD12864_DisplayString(3,5,uchartostr(RxBuf[1]));
+			       LCD12864_DisplayString(3,6,"℃");
+			}
+	}
+ }
+}	
+
