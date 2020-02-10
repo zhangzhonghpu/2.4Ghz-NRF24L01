@@ -1,0 +1,76 @@
+#include <STC12C5A60S2.H>
+
+#define uint unsigned int
+#define uchar unsigned char
+#define lcd1602 P0
+void delay_us(unsigned int n);
+void delay_ms(unsigned int n);
+sbit rs=P2^0;
+sbit rw=P2^1;
+sbit e=P1^2;
+void init1602();
+void lcdshowstr(uchar x,uchar y,uchar *str);
+
+
+void lcdwait()
+{
+	uchar sta;
+
+	lcd1602=0xff;
+	rs=0;
+	rw=1;
+	do {
+		e=1;
+		sta=lcd1602;
+		e=0;
+	} while(sta&0x80);
+}
+void lcdwrite(uchar cmd)
+{
+	lcdwait();
+	rs=0;
+	rw=0;
+	lcd1602=cmd;
+	delay_ms(5);
+	e=1;
+	delay_ms(5);
+	e=0;
+}
+void lcddat(uchar dat)
+{
+	lcdwait();
+	rs=1;
+	rw=0;
+	lcd1602=dat;
+	delay_ms(5);
+	e=1;
+	delay_ms(5);
+	e=0;
+
+}
+void lcdset(uchar x,uchar y)
+{
+	uchar addr;
+
+	if (y==0)
+		addr=0x00+x;
+	else
+		addr=0x40+x;
+	lcdwrite(addr|0x80);
+		
+}
+void LcdShowStr(uchar x,uchar y,uchar *str)
+{
+	lcdset(x,y);
+	while(*str !='\0')
+		{
+			lcddat(*str++);
+		}
+}
+void init1602()
+{
+	lcdwrite(0x38);
+	lcdwrite(0x0c);
+	lcdwrite(0x06);
+	lcdwrite(0x01);
+}
