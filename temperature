@@ -1,0 +1,81 @@
+#include "temperature.h"
+#include "delay.h"
+
+sbit DS18B20_DS=P3^5;  //DS18B20单总线端口
+
+int M,L,H,dect,dec1;
+int table[2];
+
+/******初始化温度传感器*******/
+bit DS18B20_init(void)
+{
+	bit i;
+	DS18B20_DS=1;
+	_nop_();
+	DS18B20_DS=0;
+	delay_us(500); //拉低总线500us复位DS18B20
+	DS18B20_DS=1;
+	delay_us(40);  //延时37.95us等待DS18B20发回一个信号
+	i=DS18B20_DS;
+	delay_us(140); //延时141.95us
+	DS18B20_DS=1;         //释放总线
+	_nop_();
+	return (i);
+}
+/***********写一个字节**********/
+void DS18B20_writedate(int dat)
+{
+	unsigned char i;
+	for(i=0;i<8;i++)
+	{
+		DS18B20_DS=0;
+		_nop_();
+		DS18B20_DS=dat&0x01; //一位一位发送数据
+		delay_us(70); //延时约70us
+		DS18B20_DS=1;         //释放总线
+		_nop_();
+		dat>>=1;
+	}
+	DS18B20_DS=1;
+}
+/**********读温度传感器返回的数据********/
+int DS18B20_readdate(void)
+{
+	unsigned char i,j,dat;
+	for(i=0;i<8;i++)
+	{
+		DS18B20_DS=1;
+		_nop_();
+		DS18B20_DS=0;
+		_nop_();
+		DS18B20_DS=1;
+		_nop_();
+		j=DS18B20_DS;            //读取数据
+		delay_us(70);    //延时约70us
+		_nop_();
+		dat=(dat>>1)|(j<<7);//数据处理，将读到的数据整合为一个字节
+		delay_us(50);
+	}
+	return (dat);
+}
+/*********返回叫温度计算的值**********/
+int T_count(void)
+{
+		DS18B20_init();        //初始化
+		DS18B20_writedate(0xcc);   //跳过ROM
+		DS18B20_writedate(0x44);   //启动温度转换指令
+		delay_ms(750);
+		DS18B20_init();            //再次初始化
+		DS18B20_writedate(0xcc);   //跳过ROM
+		DS18B20_writedate(0xbe);  //读取暂存器
+		L=DS18B20_readdate();    //将温度暂存器值的低8位赋值给L
+		H=DS18B20_readdate();    //将温度暂存器值的高8位赋值给H
+		M=H;                     //将高八位赋值给M
+		M<<=8;                  //将高八位数据左右8位
+		M|=L;
+		dect=M&0xf;                   //将低八位数据和高八位数据整合
+		M=((int)H<<8)+L;
+		M=M*10*0.0625L+0.5;	
+		return M;             //返回温度结果
+}
+
