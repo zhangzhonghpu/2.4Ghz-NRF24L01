@@ -1,0 +1,73 @@
+#include <STC12C5A60S2.H>
+#include "NRF.H"
+#include "delay.h"
+#include "temperature.h"
+extern void init1602();
+extern void lcdshowstr(uchar x,uchar y,uchar *str);
+extern void lcdwrite(int cmd);
+extern void delay_us(unsigned int n);
+extern void delay_ms(unsigned int n);
+uchar str[4];
+uchar status;// 定义一个变量用来装读取到的STATUS数值
+uchar *s(uchar unm)
+{
+	uchar x,y,z,u,n;
+	x=unm/100;
+	y=unm%100;
+	z=y/10;
+	u=y%10;
+	n=0;
+	if (x!=0)
+	{
+		str[n]=x+48;
+		n++;
+	}
+	if(!(x==0&z==0))
+	{
+		str[n]=z+48;
+		n++;
+	}
+	str[n]=u+48;
+	n++;
+	str[n]='\0';
+	return str;
+}
+
+
+void main()
+{
+	int TxBuf[3];
+	int addr[5] = {0,0,0,0,0}; //定义5个数据用来装读取的本机地址
+	int sta;// 定义一个变量用来装读取到的STATUS数值
+	sta = 0;   //status置0，用于后面保存读取到的值
+	INIT_NRF();    //初始化NRF24L02
+	SPI_Read_Buf(RX_ADDR_P0,addr,5); //读取0通道接收地址
+	delay_ms(100);
+	init1602();
+  delay_ms(2);
+  lcdshowstr(0, 0, "Temp:");
+	lcdshowstr(10, 0, "C");
+	delay_ms(100);
+	lcdshowstr(0,1,"NO.1 ADDR:12345");//显示通道地址
+	delay_ms(2000);
+	
+
+	while(1)
+	{
+		TxBuf[0] = T_count()/10; 
+		TxBuf[1] = T_count()%10;
+		TxBuf[2] = 1;				//接收判断标志位 1 2 3
+		SPI_RW_reg(WRITE_REG+STATUS,0XFF);//清除状态寄存器
+		SPI_Write_Buf(WR_TX_PLOAD,TxBuf,TX_PLOAD_WIDTH);//装载数据
+		SPI_RW_reg(0XE1, 0xff);   //不管数据是否发送完毕都将数据缓存区清除
+		NRF24L02_Txpacket(TxBuf); //进行一次发送操作
+		delay_ms(1);              //延时等待数据稳定
+		SPI_RW_reg(0XE1, 0xff);   //不管数据是否发送完毕都将数据缓存区清除
+		lcdshowstr(5, 0, s(TxBuf[0]));
+		lcdshowstr(7, 0, ".");
+		lcdshowstr(8, 0, s(TxBuf[1]));
+    delay_ms(500); //延时使刷新频率减慢	
+	}
+}
+	
+
