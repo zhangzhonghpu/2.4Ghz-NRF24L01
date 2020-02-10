@@ -1,0 +1,106 @@
+#include <STC12C5A60S2.H>
+#include "NRF.h"
+
+
+int const TX_ADDRESS[5] = {0x01,0x02,0x03,0x04,0x05};
+
+/*******NRF2402的SPI 写时序*******///Reg
+int SPI_RW(int uuchar)
+{
+	int bit_ctr;
+	for(bit_ctr=0;bit_ctr<8;bit_ctr++)
+	{
+		RF_MOSI = (uuchar & 0x80);//输出uuchar的最高位
+		uuchar = (uuchar << 1);   //左移一位
+		RF_SCK = 1;               //将时钟线置1
+		uuchar |= RF_MISO;        //同时读取STATUS
+		RF_SCK = 0;                  //然后再将时钟线置0
+	}
+	return (uuchar);            //返回读取的值
+}
+
+
+
+
+/*****NRF2402的SPI 读取一个字节时序****/
+int SPI_Read(int reg)
+{
+	int reg_val;
+	RF_CSN = 0;             //CSN置0，允许指令操作
+	SPI_RW(reg);            //写一条reg指令
+	reg_val = SPI_RW(0);    //读取reg的值到reg_val
+	RF_CSN = 1;             //CSN置1，禁止操作
+	return (reg_val);       //返回读取的值
+}
+
+
+/*****NRF2402写一个字节到寄存器函数*****/
+int SPI_RW_reg(int reg,int value)
+{ 
+	uchar status;          
+	RF_CSN = 0;             //CSN置0，允许操作
+	status = SPI_RW(reg);   //写指令，并读取STATUS
+	SPI_RW(value);          //写数据值到reg
+	RF_CSN = 1;             //CSN置1，禁止操作
+	return (status);        //返回STATUS值
+}
+
+
+
+/***读数据函数，reg：为寄存器地址，pBuf为待读出数据地址，uchars读出数据的个数***/
+int SPI_Read_Buf(int reg,int *pBuf,int uchars)
+{
+	int sta,uchar_ctr;
+	RF_CSN = 0;      //将CSN拉低初始化SPI
+	sta = SPI_RW(reg); //选择写入寄存器并读出STATUS中的数据
+	for(uchar_ctr=0;uchar_ctr<uchars;uchar_ctr++)
+	{pBuf[uchar_ctr] = SPI_RW(0);}
+	RF_CSN = 1;
+	return(sta);     //返回STATUS中的值
+	
+}
+
+
+
+/* 用于写数据的函数 */
+// 参数：reg:为寄存器地址，pBUF:为待写入数据地址，uchars：写入数据的个数
+// 返回值：sta
+int SPI_Write_Buf(int reg,int *pBuf,int uchars)
+{
+	int sta,uchar_ctr;
+	RF_CSN = 0;   //将CSN拉低初始化话SPI
+	sta = SPI_RW(reg);
+	for(uchar_ctr=0;uchar_ctr<uchars;uchar_ctr++)
+	{SPI_RW(*pBuf++);}
+	RF_CSN = 1; //关闭SPI
+	return(sta);
+}
+
+
+
+/*******NRF24L01初始化********/
+void INIT_NRF()
+{
+	RF_CE = 0;    //CE置0，射频电路停止工作
+	RF_CSN = 1;   //CSN置1，禁止指令操作
+	RF_SCK = 0;   //SCK置0；禁止读写寄存器
+	RF_IRQ = 1;   //IRQ置1，中断复位，等待产生中断信号
+	SPI_RW_reg(WRITE_REG+EN_AA,0x00);//频道0自动 ACK应答禁止
+	SPI_RW_reg(WRITE_REG+SETUP_RETR,0X00);//禁止自动发送
+	SPI_RW_reg(WRITE_REG+EN_RXADDR,0X01);//允许接收地址只有频道0
+	SPI_RW_reg(WRITE_REG+RF_CH,1);//设置信道工作为2.4GHZ，收发必须一致
+	SPI_RW_reg(WRITE_REG+RX_PW_P0,RX_PLOAD_WIDTH);//设置就收地址长度为32字节
+	SPI_RW_reg(WRITE_REG+RF_SETUP,0X07);//发射速率为2MHZ，发送功率最大值为0dB
+	
+}
+/******发送TX_BUF中的数据*********/
+void NRF24L02_Txpacket(int *tx_buf)
+{
+	RF_CE = 0;    //停止射频电路工作
+	SPI_Write_Buf(WRITE_REG+TX_ADDR,TX_ADDRESS,TX_ADR_WIDTH);//写入本机地址
+	SPI_Write_Buf(WRITE_REG+RX_ADDR_P0,TX_ADDRESS,TX_ADR_WIDTH);//装载接收端地址
+	SPI_Write_Buf(WR_TX_PLOAD,tx_buf,TX_PLOAD_WIDTH);//装载要发送的数据
+	SPI_RW_reg(WRITE_REG+CONFIG,0X0E);//IRQ收发完成中断响应，16位CRC，发送模式 
+	RF_CE = 1; //置高CE，激发数据发送
+	
+}
